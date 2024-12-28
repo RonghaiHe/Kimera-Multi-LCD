@@ -272,11 +272,22 @@ bool LoopClosureDetector::detectLoop(const RobotPoseId& vertex_query,
   return false;
 }
 
+/**
+ * @brief 计算两个机器人位姿之间的匹配索引。
+ * 
+ * 该函数计算给定的两个机器人位姿（顶点）之间的特征匹配，并存储每个位姿的匹配特征索引。
+ * 
+ * @param vertex_query 查询机器人位姿的ID。
+ * @param vertex_match 匹配机器人位姿的ID。
+ * @param i_query 指向一个向量，用于存储查询位姿的匹配特征索引。
+ * @param i_match 指向一个向量，用于存储匹配位姿的匹配特征索引。
+ */
 void LoopClosureDetector::computeMatchedIndices(
     const RobotPoseId& vertex_query,
     const RobotPoseId& vertex_match,
     std::vector<unsigned int>* i_query,
     std::vector<unsigned int>* i_match) const {
+  // 确保输出向量不为空并清空它们。
   assert(i_query != NULL);
   assert(i_match != NULL);
   i_query->clear();
@@ -285,21 +296,27 @@ void LoopClosureDetector::computeMatchedIndices(
   // Get two best matches between frame descriptors.
   std::vector<DMatchVec> matches;
 
+  // 获取与给定机器人位姿ID对应的VLC帧。
   VLCFrame frame_query = vlc_frames_.find(vertex_query)->second;
   VLCFrame frame_match = vlc_frames_.find(vertex_match)->second;
 
   try {
+    // 使用ORB特征匹配器找到每个描述子的两个最佳匹配。
     orb_feature_matcher_->knnMatch(
         frame_query.descriptors_mat_, frame_match.descriptors_mat_, matches, 2u);
   } catch (cv::Exception& e) {
     ROS_ERROR("Failed KnnMatch in ComputeMatchedIndices. ");
   }
 
+  // 遍历匹配结果并应用Lowe比率测试以过滤出好的匹配。
   const size_t& n_matches = matches.size();
   for (size_t i = 0; i < n_matches; i++) {
     const DMatchVec& match = matches[i];
+    // 跳过无效的匹配。
     if (match.size() < 2) continue;
+    // 应用Lowe比率测试。
     if (match[0].distance < params_.lowe_ratio_ * match[1].distance) {
+      // 将好的匹配索引添加到输出向量中。
       i_query->push_back(match[0].queryIdx);
       i_match->push_back(match[0].trainIdx);
     }
@@ -363,24 +380,44 @@ bool LoopClosureDetector::geometricVerificationNister(
   return false;
 }
 
+/**
+ * @brief 尝试恢复查询帧和匹配帧之间的相对位姿
+ * 
+ * 本函数使用RANSAC算法来估计两帧之间的相对位姿。它首先通过关键点匹配来建立两帧之间的对应关系，
+ * 然后使用这些对应关系来估计位姿。如果估计成功且内点数量和内点比例满足要求，则认为位姿估计成功。
+ * 
+ * @param vertex_query 查询帧的ID
+ * @param vertex_match 匹配帧的ID
+ * @param inlier_query 查询帧的内点索引数组指针，函数会清空并填充新的内点索引
+ * @param inlier_match 匹配帧的内点索引数组指针，函数会清空并填充新的内点索引
+ * @param T_query_match 指向查询帧相对于匹配帧的位姿指针，如果函数成功，将填充此位姿
+ * @param R_query_match_prior 指向查询帧相对于匹配帧的旋转先验指针，如果提供，将用于初始化RANSAC算法
+ * @return true 如果位姿估计成功且通过内点数量和比例的检验
+ * @return false 否则
+ */
 bool LoopClosureDetector::recoverPose(const RobotPoseId& vertex_query,
                                       const RobotPoseId& vertex_match,
                                       std::vector<unsigned int>* inlier_query,
                                       std::vector<unsigned int>* inlier_match,
                                       gtsam::Pose3* T_query_match,
                                       const gtsam::Rot3* R_query_match_prior) {
+  // 检查输出参数不为空
   CHECK_NOTNULL(inlier_query);
   CHECK_NOTNULL(inlier_match);
   total_geometric_verifications_++;
+  
+  // 用于stereo RANSAC算法的输入索引数据
   std::vector<unsigned int> i_query;  // input indices to stereo ransac
   std::vector<unsigned int> i_match;
 
+  // 存储匹配的关键点
   opengv::points_t f_match, f_query;
   for (size_t i = 0; i < inlier_match->size(); i++) {
     gtsam::Vector3 point_query =
         vlc_frames_[vertex_query].keypoints_.at(inlier_query->at(i));
     gtsam::Vector3 point_match =
         vlc_frames_[vertex_match].keypoints_.at(inlier_match->at(i));
+    // 确保关键点有效
     if (point_query.norm() > 1e-3 && point_match.norm() > 1e-3) {
       f_query.push_back(point_query);
       f_match.push_back(point_match);
@@ -389,12 +426,15 @@ bool LoopClosureDetector::recoverPose(const RobotPoseId& vertex_query,
     }
   }
 
+  // 如果有效关键点对少于3个，直接返回失败
   if (f_query.size() < 3) {
     // ROS_INFO("Less than 3 putative correspondences.");
     return false;
   }
 
+  // 创建适配器对象用于RANSAC算法
   AdapterStereo adapter(f_query, f_match);
+  // 如果提供了旋转先验，设置到适配器
   if (R_query_match_prior) {
     // Use input rotation estimate as prior
     adapter.setR12(R_query_match_prior->matrix());
@@ -411,13 +451,16 @@ bool LoopClosureDetector::recoverPose(const RobotPoseId& vertex_query,
   // Compute transformation via RANSAC.
   bool ransac_success = ransac.computeModel();
 
+  // 如果RANSAC算法成功
   if (ransac_success) {
+    // 检查内点数量是否足够
     if (ransac.inliers_.size() < params_.geometric_verification_min_inlier_count_) {
       // ROS_INFO_STREAM("Number of inlier correspondences after RANSAC "
       //                 << ransac.inliers_.size() << " is too low.");
       return false;
     }
 
+    // 检查内点比例是否足够
     double inlier_percentage =
         static_cast<double>(ransac.inliers_.size()) / f_match.size();
     if (inlier_percentage < params_.geometric_verification_min_inlier_percentage_) {
@@ -426,8 +469,11 @@ bool LoopClosureDetector::recoverPose(const RobotPoseId& vertex_query,
       return false;
     }
 
+    // 获取估计的变换矩阵
     opengv::transformation_t T = ransac.model_coefficients_;
 
+    // 提取平移向量
+    // XXX no use and can be removed? 
     gtsam::Point3 estimated_translation(T(0, 3), T(1, 3), T(2, 3));
 
     // Output is the 3D transformation from the match frame to the query frame
