@@ -274,9 +274,9 @@ bool LoopClosureDetector::detectLoop(const RobotPoseId& vertex_query,
 
 /**
  * @brief 计算两个机器人位姿之间的匹配索引。
- * 
+ *
  * 该函数计算给定的两个机器人位姿（顶点）之间的特征匹配，并存储每个位姿的匹配特征索引。
- * 
+ *
  * @param vertex_query 查询机器人位姿的ID。
  * @param vertex_match 匹配机器人位姿的ID。
  * @param i_query 指向一个向量，用于存储查询位姿的匹配特征索引。
@@ -382,16 +382,17 @@ bool LoopClosureDetector::geometricVerificationNister(
 
 /**
  * @brief 尝试恢复查询帧和匹配帧之间的相对位姿
- * 
+ *
  * 本函数使用RANSAC算法来估计两帧之间的相对位姿。它首先通过关键点匹配来建立两帧之间的对应关系，
  * 然后使用这些对应关系来估计位姿。如果估计成功且内点数量和内点比例满足要求，则认为位姿估计成功。
- * 
+ *
  * @param vertex_query 查询帧的ID
  * @param vertex_match 匹配帧的ID
  * @param inlier_query 查询帧的内点索引数组指针，函数会清空并填充新的内点索引
  * @param inlier_match 匹配帧的内点索引数组指针，函数会清空并填充新的内点索引
  * @param T_query_match 指向查询帧相对于匹配帧的位姿指针，如果函数成功，将填充此位姿
- * @param R_query_match_prior 指向查询帧相对于匹配帧的旋转先验指针，如果提供，将用于初始化RANSAC算法
+ * @param R_query_match_prior
+ * 指向查询帧相对于匹配帧的旋转先验指针，如果提供，将用于初始化RANSAC算法
  * @return true 如果位姿估计成功且通过内点数量和比例的检验
  * @return false 否则
  */
@@ -405,7 +406,7 @@ bool LoopClosureDetector::recoverPose(const RobotPoseId& vertex_query,
   CHECK_NOTNULL(inlier_query);
   CHECK_NOTNULL(inlier_match);
   total_geometric_verifications_++;
-  
+
   // 用于stereo RANSAC算法的输入索引数据
   std::vector<unsigned int> i_query;  // input indices to stereo ransac
   std::vector<unsigned int> i_match;
@@ -473,7 +474,7 @@ bool LoopClosureDetector::recoverPose(const RobotPoseId& vertex_query,
     opengv::transformation_t T = ransac.model_coefficients_;
 
     // 提取平移向量
-    // XXX no use and can be removed? 
+    // XXX no use and can be removed?
     gtsam::Point3 estimated_translation(T(0, 3), T(1, 3), T(2, 3));
 
     // Output is the 3D transformation from the match frame to the query frame
