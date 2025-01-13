@@ -334,8 +334,8 @@ bool LoopClosureDetector::geometricVerificationNister(
   // Use RANSAC to solve the central-relative-pose problem.
   opengv::sac::Ransac<RansacProblem> ransac;
 
-  ransac.sac_model_ =
-      std::make_shared<RansacProblem>(adapter, RansacProblem::Algorithm::NISTER, true);
+  ransac.sac_model_ = std::make_shared<RansacProblem>(
+      adapter, RansacProblem::Algorithm::NISTER, params_.ransac_randomize_);
   ransac.max_iterations_ = params_.max_ransac_iterations_mono_;
   ransac.threshold_ = params_.ransac_threshold_mono_;
 
@@ -402,7 +402,7 @@ bool LoopClosureDetector::recoverPose(const RobotPoseId& vertex_query,
 
   // Compute transform using RANSAC 3-point method (Arun).
   std::shared_ptr<RansacProblemStereo> ptcloudproblem_ptr(
-      new RansacProblemStereo(adapter, true));
+      new RansacProblemStereo(adapter, params_.ransac_randomize_));
   opengv::sac::Ransac<RansacProblemStereo> ransac;
   ransac.sac_model_ = ptcloudproblem_ptr;
   ransac.max_iterations_ = params_.max_ransac_iterations_;
