@@ -342,6 +342,12 @@ bool LoopClosureDetector::geometricVerificationNister(
   // Compute transformation via RANSAC.
   bool ransac_success = ransac.computeModel();
   if (ransac_success) {
+    if (ransac.inliers_.size() < params_.ransac_inlier_mono_count_) {
+      // ROS_INFO_STREAM("Number of inlier correspondences after mono RANSAC "
+      //                 << ransac.inliers_.size() << " is too low.");
+      return false;
+    }
+
     double inlier_percentage =
         static_cast<double>(ransac.inliers_.size()) / query_versors.size();
 

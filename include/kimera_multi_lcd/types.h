@@ -202,6 +202,7 @@ struct LcdParams {
   // Parameters for geometric verification
   bool ransac_randomize_;
   double ransac_threshold_mono_;
+  int ransac_inlier_mono_count_;
   double ransac_inlier_percentage_mono_;
   int max_ransac_iterations_mono_;
 
